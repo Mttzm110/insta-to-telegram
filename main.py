@@ -1,8 +1,8 @@
 import os
 import logging
 from flask import Flask, request
-from telegram import Bot, Update
-from telegram.ext import Dispatcher, CommandHandler, MessageHandler, filters
+from telegram import Update, Bot
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 from yt_dlp import YoutubeDL
 from dotenv import load_dotenv
 
@@ -12,23 +12,23 @@ PORT = int(os.getenv("PORT", "10000"))
 
 logging.basicConfig(level=logging.INFO)
 app = Flask(__name__)
-bot = Bot(TOKEN)
-dp = Dispatcher(bot, None, workers=0, use_context=True)
+bot = Bot(token=TOKEN)
+
+# ساخت Application
+application = ApplicationBuilder().token(TOKEN).build()
 
 ydl_opts = {
-    'archive': False,
     'format': 'mp4',
     'outtmpl': '%(id)s.%(ext)s',
 }
 
-@dp.message_handler(filters.TEXT & (~filters.COMMAND))
-def handle_message(update: Update, context):
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url = update.message.text.strip()
     if "instagram.com" not in url:
-        update.message.reply_text("لطفاً یک لینک معتبر از اینستاگرام بفرستید.")
+        await update.message.reply_text("لطفاً یک لینک معتبر از اینستاگرام بفرستید.")
         return
 
-    msg = update.message.reply_text("⏳ در حال دانلود...")
+    msg = await update.message.reply_text("⏳ در حال دانلود...")
     try:
         with YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
@@ -36,19 +36,27 @@ def handle_message(update: Update, context):
 
         with open(filepath, "rb") as f:
             if info.get("ext") in ("mp4", "mkv", "webm"):
-                bot.send_video(chat_id=update.message.chat_id, video=f)
+                await bot.send_video(chat_id=update.message.chat_id, video=f)
             else:
-                bot.send_photo(chat_id=update.message.chat_id, photo=f)
+                await bot.send_photo(chat_id=update.message.chat_id, photo=f)
 
         os.remove(filepath)
-        msg.edit_text("✅ دانلود و ارسال با موفقیت انجام شد!")
+        await msg.edit_text("✅ دانلود و ارسال با موفقیت انجام شد!")
     except Exception as e:
         logging.exception(e)
-        msg.edit_text("❌ مشکلی پیش اومد! مطمئن باش لینک صحیح باشه.")
+        await msg.edit_text("❌ مشکلی پیش اومد! مطمئن باش لینک صحیح باشه.")
+
+application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
 
 @app.route(f"/{TOKEN}", methods=["POST"])
 def webhook():
-    dp.process_update(Update.de_json(request.get_json(force=True), bot))
+    from telegram import Update
+    from telegram.ext import ContextTypes
+
+    update = Update.de_json(request.get_json(force=True), bot)
+    # از async در Flask چون نداریم، باید sync اجرا کنیم
+    import asyncio
+    asyncio.run(application.process_update(update))
     return "OK", 200
 
 @app.route("/ping", methods=["GET"])
