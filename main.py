@@ -14,13 +14,15 @@ logging.basicConfig(level=logging.INFO)
 app = Flask(__name__)
 bot = Bot(token=TOKEN)
 
-# ساخت Application
 application = ApplicationBuilder().token(TOKEN).build()
 
 ydl_opts = {
     'format': 'mp4',
-    'outtmpl': '%(id)s.%(ext)s',
+    'outtmpl': '/tmp/%(id)s.%(ext)s',  # ذخیره تو /tmp برای جلوگیری از مشکل دسترسی نوشتن
 }
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("سلام! لینک اینستاگرام بفرست تا عکس یا ویدیو رو برات ارسال کنم.")
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url = update.message.text.strip()
@@ -46,17 +48,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logging.exception(e)
         await msg.edit_text("❌ مشکلی پیش اومد! مطمئن باش لینک صحیح باشه.")
 
+application.add_handler(CommandHandler("start", start))
 application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
 
 @app.route(f"/{TOKEN}", methods=["POST"])
 def webhook():
-    from telegram import Update
-    from telegram.ext import ContextTypes
-
     update = Update.de_json(request.get_json(force=True), bot)
-    # از async در Flask چون نداریم، باید sync اجرا کنیم
     import asyncio
-    asyncio.run(application.process_update(update))
+    try:
+        asyncio.run(application.process_update(update))
+    except Exception as e:
+        logging.error(f"Error processing update: {e}", exc_info=True)
     return "OK", 200
 
 @app.route("/ping", methods=["GET"])
