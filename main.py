@@ -17,7 +17,6 @@ bot = Bot(token=TOKEN)
 
 application = ApplicationBuilder().token(TOKEN).build()
 
-# Initialize and start the application before handling requests
 async def initialize_app():
     await application.initialize()
     await application.start()
@@ -26,7 +25,7 @@ asyncio.run(initialize_app())
 
 ydl_opts = {
     'format': 'mp4',
-    'outtmpl': '/tmp/%(id)s.%(ext)s',  # Save files to /tmp directory
+    'outtmpl': '/tmp/%(id)s.%(ext)s',
 }
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -76,6 +75,7 @@ def ping():
 def home():
     return "Bot is running!", 200
 
-if __name__ == "__main__":
-    from waitress import serve
-    serve(app, host="0.0.0.0", port=PORT)
+# دیگه لازم نیست این بخش باشه چون gunicorn خودش اجرا میکنه
+# if __name__ == "__main__":
+#     from waitress import serve
+#     serve(app, host="0.0.0.0", port=PORT)
