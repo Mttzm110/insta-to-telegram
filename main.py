@@ -5,6 +5,7 @@ from telegram import Update, Bot
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 from yt_dlp import YoutubeDL
 from dotenv import load_dotenv
+import asyncio
 
 load_dotenv()
 TOKEN = os.getenv("TELEGRAM_TOKEN")
@@ -16,9 +17,16 @@ bot = Bot(token=TOKEN)
 
 application = ApplicationBuilder().token(TOKEN).build()
 
+# Initialize and start the application before handling requests
+async def initialize_app():
+    await application.initialize()
+    await application.start()
+
+asyncio.run(initialize_app())
+
 ydl_opts = {
     'format': 'mp4',
-    'outtmpl': '/tmp/%(id)s.%(ext)s',  # ذخیره تو /tmp برای جلوگیری از مشکل دسترسی نوشتن
+    'outtmpl': '/tmp/%(id)s.%(ext)s',  # Save files to /tmp directory
 }
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -54,7 +62,6 @@ application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle
 @app.route(f"/{TOKEN}", methods=["POST"])
 def webhook():
     update = Update.de_json(request.get_json(force=True), bot)
-    import asyncio
     try:
         asyncio.run(application.process_update(update))
     except Exception as e:
